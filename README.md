@@ -1,10 +1,10 @@
 # Machine Vision
 
-Machine Vision is a smart-home security analytics layer built around Frigate-generated person tracking. It does not run a second object detector. Instead, it listens for Frigate events, maintains tracks, applies spatial rules, detects suspicious behavior, and emits structured JSON events for downstream automation.
+Machine Vision is a smart-home security analytics layer built around Frigate-generated person tracking. It does not run a second object detector. Instead, it polls a Frigate REST API, maintains tracks, applies spatial rules, detects suspicious behavior, and emits structured JSON events over HTTP for downstream automation.
 
 ## What this project does
 
-- ingests person-tracking events over a REST API
+- ingests person-tracking events through the Frigate REST API
 - normalizes Frigate payloads into an internal observation model
 - tracks people across time and camera events
 - detects zone entry and restricted-area activity
@@ -23,7 +23,7 @@ Camera
 Frigate (YOLO + tracking)
   │
   ▼
-REST API: /api/events
+Frigate REST API: /api/events
   │
   ▼
 Machine Vision
@@ -38,7 +38,7 @@ Machine Vision
   └─ VisionEvent generation
         │
         ▼
-REST API: /api/v1/observations or any configured output URL
+HTTP output endpoint: /api/v1/observations or configured REST URL
 ```
 
 Important: this service expects Frigate to do the actual person detection and tracking. It is the decision layer, not the ML detector itself.
@@ -186,12 +186,19 @@ cd /workspaces/machine_vision/docker
 docker compose up -d
 ```
 
-Then run the service:
+Then run the HTTP service:
 
 ```bash
 cd /workspaces/machine_vision
 python src/main.py --rest
 ```
+
+The service exposes FastAPI endpoints such as:
+
+- `GET /health`
+- `GET /api/v1/events`
+- `POST /api/v1/observations`
+- `POST /api/v1/batch`
 
 ## Configuration
 
@@ -230,7 +237,7 @@ entrances:
 
 ## Frigate integration
 
-Frigate is the expected upstream detector and tracker. This service polls the Frigate REST API and treats those payloads as person observations. In practice, your flow is:
+Frigate is the expected upstream detector and tracker. This service polls the Frigate REST API and treats those payloads as person observations. The ingestion path is HTTP-only. In practice, your flow is:
 
 ```text
 Camera -> Frigate REST API -> Machine Vision -> policy / automation layer
@@ -261,7 +268,7 @@ All emitted alerts are structured as `VisionEvent` objects with fields such as:
 - `confidence`
 - `metadata`
 
-These are serialized as JSON and sent to the configured REST output endpoint.
+These are serialized as JSON and delivered to the configured REST output endpoint over HTTP.
 
 ## Notes
 
@@ -321,7 +328,7 @@ cd /workspaces/machine_vision/docker
 docker compose up --build
 ```
 
-This starts the REST API service and can connect to Frigate and CompreFace from other containers on the same Docker network.
+This starts the HTTP service and allows the app to reach Frigate and CompreFace over the Docker network using REST endpoints.
 
 ## Troubleshooting
 
