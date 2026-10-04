@@ -17,13 +17,9 @@ def create_pipeline() -> VisionPipeline:
         "entrances": settings.lines or DEFAULT_ENTRANCES,
         "loitering_threshold_seconds": settings.loiter_threshold_seconds,
         "tailgate_window_seconds": settings.tailgate_window_seconds,
-        "mqtt_host": settings.mqtt_host,
-        "mqtt_port": settings.mqtt_port,
-        "mqtt_output_topic": settings.mqtt_output_topic,
+        "restapi_url": settings.restapi_url,
+        "restapi_api_key": settings.restapi_api_key,
     }
-    if os.getenv("MQTT_HOST") is None and os.getenv("MQTT_PORT") is None:
-        config["mqtt_host"] = None
-        config["mqtt_port"] = None
     return VisionPipeline(config)
 
 

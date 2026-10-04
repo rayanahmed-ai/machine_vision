@@ -1,28 +1,14 @@
 version: "3.9"
 
 services:
-  mosquitto:
-    image: eclipse-mosquitto:2
-    container_name: machine-vision-mosquitto
-    ports:
-      - "1883:1883"
-    volumes:
-      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
-      - mosquitto-data:/mosquitto/data
-      - mosquitto-log:/mosquitto/log
-
   machine-vision:
     build:
       context: ..
       dockerfile: Dockerfile
     container_name: machine-vision
-    depends_on:
-      - mosquitto
     environment:
-      MQTT_HOST: mosquitto
-      MQTT_PORT: 1883
-      MQTT_TOPIC: frigate/events
-      MQTT_OUTPUT_TOPIC: home/vision/events
+      RESTAPI_URL: http://localhost:8000
+      FRIGATE_URL: http://frigate:5000
       LOITER_THRESHOLD_SECONDS: 30
       TAILGATE_WINDOW_SECONDS: 3
       COMPREFACE_URL: http://compreface:8000
@@ -30,8 +16,4 @@ services:
       COMPREFACE_MIN_SIMILARITY: 0.80
     volumes:
       - ..:/app
-    command: python src/main.py --demo
-
-volumes:
-  mosquitto-data:
-  mosquitto-log:
+    command: python src/main.py --rest

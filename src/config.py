@@ -20,10 +20,9 @@ def _read_yaml(path: Path) -> dict[str, Any]:
 
 @dataclass
 class Settings:
-    mqtt_host: str = "localhost"
-    mqtt_port: int = 1883
-    mqtt_topic: str = "frigate/events"
-    mqtt_output_topic: str = "home/vision/events"
+    restapi_url: str = "http://localhost:8000"
+    restapi_api_key: str = ""
+    frigate_url: str = "http://localhost:5000"
     loiter_threshold_seconds: float = 30.0
     tailgate_window_seconds: float = 3.0
     compreface_url: str = "http://localhost:8000"
@@ -42,10 +41,9 @@ def load_settings() -> Settings:
     thresholds_cfg = _read_yaml(config_root / "thresholds.yaml")
 
     settings = Settings(
-        mqtt_host=os.getenv("MQTT_HOST", "localhost"),
-        mqtt_port=int(os.getenv("MQTT_PORT", "1883")),
-        mqtt_topic=os.getenv("MQTT_TOPIC", "frigate/events"),
-        mqtt_output_topic=os.getenv("MQTT_OUTPUT_TOPIC", "home/vision/events"),
+        restapi_url=os.getenv("RESTAPI_URL") or os.getenv("REST_API_URL") or "http://localhost:8000",
+        restapi_api_key=os.getenv("RESTAPI_API_KEY", ""),
+        frigate_url=os.getenv("FRIGATE_URL") or os.getenv("FRIGATE_REST_URL") or "http://localhost:5000",
         loiter_threshold_seconds=float(os.getenv("LOITER_THRESHOLD_SECONDS", thresholds_cfg.get("loiter_threshold_seconds", 30.0))),
         tailgate_window_seconds=float(os.getenv("TAILGATE_WINDOW_SECONDS", thresholds_cfg.get("tailgate_window_seconds", 3.0))),
         compreface_url=os.getenv("COMPREFACE_URL", "http://localhost:8000"),

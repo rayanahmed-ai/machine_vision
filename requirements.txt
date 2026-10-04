@@ -1,6 +1,5 @@
 numpy>=1.26
 opencv-python>=4.8
-paho-mqtt>=2.0.0
 PyYAML>=6.0
 pydantic>=2.7.0
 python-dotenv>=1.0.1

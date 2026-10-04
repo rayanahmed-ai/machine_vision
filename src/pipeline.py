@@ -9,7 +9,7 @@ from src.behavior.loitering import LoiteringEngine
 from src.behavior.tailgating import TailgatingEngine
 from src.context.context_engine import ContextEngine
 from src.events.event_generator import build_event
-from src.events.mqtt_publisher import MQTTEventPublisher
+from src.events.restapi_publisher import RestEventPublisher
 from src.incidents.manager import IncidentManager
 from src.models.identity import IdentityStatus
 from src.models.track import Track
@@ -42,13 +42,11 @@ class VisionPipeline:
         self.dwell_calculator = DwellTimeCalculator()
         self.context_engine = ContextEngine()
         self.incident_manager = IncidentManager()
-        mqtt_host = self.config.get("mqtt_host")
-        mqtt_port = self.config.get("mqtt_port")
-        if mqtt_host:
-            self.publisher = MQTTEventPublisher(
-                host=mqtt_host,
-                port=mqtt_port if mqtt_port is not None else 1883,
-                output_topic=self.config.get("mqtt_output_topic", "home/vision/events"),
+        restapi_url = self.config.get("restapi_url") or self.config.get("rest_api_url") or self.config.get("output_url")
+        if restapi_url:
+            self.publisher = RestEventPublisher(
+                url=restapi_url,
+                api_key=self.config.get("restapi_api_key") or self.config.get("api_key"),
             )
         else:
             self.publisher = None

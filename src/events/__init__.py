@@ -1,6 +1,6 @@
 """Event generation and publishing."""
 
 from .event_generator import build_event
-from .mqtt_publisher import MQTTEventPublisher
+from .restapi_publisher import RestEventPublisher
 
-__all__ = ["build_event", "MQTTEventPublisher"]
+__all__ = ["build_event", "RestEventPublisher"]

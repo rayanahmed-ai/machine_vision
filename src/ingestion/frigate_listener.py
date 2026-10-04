@@ -1,58 +1,57 @@
 from __future__ import annotations
 
-import json
 import logging
+import threading
 from typing import Any
+
+import requests
 
 from src.ingestion.normalizer import normalize_observation
 
 logger = logging.getLogger(__name__)
 
-try:  # pragma: no cover - depends on runtime install
-    import paho.mqtt.client as mqtt
-except Exception:  # pragma: no cover
-    mqtt = None
 
+class FrigateRESTListener:
+    """Polls a Frigate REST API for event payloads and forwards normalized observations."""
 
-class FrigateMQTTListener:
-    """Consumes Frigate events from MQTT and forwards normalized observations."""
-
-    def __init__(self, pipeline: Any, mqtt_host: str = "localhost", mqtt_port: int = 1883, topic: str = "frigate/events") -> None:
+    def __init__(self, pipeline: Any, restapi_url: str = "http://localhost:5000", api_key: str | None = None, poll_interval: float = 5.0) -> None:
         self.pipeline = pipeline
-        self.mqtt_host = mqtt_host
-        self.mqtt_port = mqtt_port
-        self.topic = topic
-        self.client = None
-        self._initialize_client()
+        self.restapi_url = (restapi_url or "").rstrip("/")
+        self.api_key = api_key
+        self.poll_interval = poll_interval
+        self._thread: threading.Thread | None = None
+        self._stop_event = threading.Event()
 
-    def _initialize_client(self) -> None:
-        if mqtt is None:
-            logger.warning("paho-mqtt is not installed; MQTT listener disabled")
-            return
+    def _headers(self) -> dict[str, str]:
+        headers = {"Accept": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        return headers
 
-        self.client = mqtt.Client()
-        self.client.on_connect = self._on_connect
-        self.client.on_message = self._on_message
-        self.client.on_disconnect = self._on_disconnect
+    def _fetch_events(self) -> list[dict[str, Any]]:
+        if not self.restapi_url:
+            logger.warning("Frigate REST listener disabled: no URL configured")
+            return []
 
-    def _on_connect(self, client: Any, userdata: Any, flags: Any, rc: int) -> None:
-        logger.info("Connected to MQTT broker %s:%s with code %s", self.mqtt_host, self.mqtt_port, rc)
-        client.subscribe(self.topic)
-
-    def _on_disconnect(self, client: Any, userdata: Any, rc: int) -> None:
-        logger.warning("MQTT disconnected from %s:%s with rc=%s", self.mqtt_host, self.mqtt_port, rc)
-
-    def _on_message(self, client: Any, userdata: Any, message: Any) -> None:
+        url = f"{self.restapi_url}/api/events"
         try:
-            payload = json.loads(message.payload.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            logger.warning("Ignoring malformed MQTT payload on %s", self.topic)
-            return
+            response = requests.get(url, headers=self._headers(), timeout=10)
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            logger.warning("Frigate REST poll failed for %s: %s", url, exc)
+            return []
 
-        if not isinstance(payload, dict):
-            logger.warning("Ignoring non-dictionary payload on %s", self.topic)
-            return
+        payload = response.json()
+        if isinstance(payload, list):
+            return [item for item in payload if isinstance(item, dict)]
+        if isinstance(payload, dict):
+            for key in ("events", "data", "items"):
+                value = payload.get(key)
+                if isinstance(value, list):
+                    return [item for item in value if isinstance(item, dict)]
+        return []
 
+    def _process_event(self, payload: dict[str, Any]) -> None:
         label = str(payload.get("label") or payload.get("type") or "").lower()
         if label and label != "person":
             logger.debug("Ignoring non-person Frigate message: %s", label)
@@ -67,12 +66,22 @@ class FrigateMQTTListener:
         self.pipeline.process_observation(normalized)
 
     def start(self) -> None:
-        if self.client is None:
-            logger.warning("MQTT listener not available because paho-mqtt is absent")
+        if not self.restapi_url:
+            logger.warning("Frigate REST listener not available because the URL is absent")
             return
-        self.client.connect(self.mqtt_host, self.mqtt_port, 60)
-        self.client.loop_forever()
+        if self._thread and self._thread.is_alive():
+            return
+
+        self._thread = threading.Thread(target=self._poll_loop, daemon=True)
+        self._thread.start()
+
+    def _poll_loop(self) -> None:
+        while not self._stop_event.is_set():
+            for event in self._fetch_events():
+                self._process_event(event)
+            self._stop_event.wait(self.poll_interval)
 
     def stop(self) -> None:
-        if self.client is not None:
-            self.client.disconnect()
+        self._stop_event.set()
+        if self._thread is not None:
+            self._thread.join(timeout=5)

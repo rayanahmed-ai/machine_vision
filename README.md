@@ -4,7 +4,7 @@ Machine Vision is a smart-home security analytics layer built around Frigate-gen
 
 ## What this project does
 
-- ingests person-tracking events from MQTT
+- ingests person-tracking events over a REST API
 - normalizes Frigate payloads into an internal observation model
 - tracks people across time and camera events
 - detects zone entry and restricted-area activity
@@ -12,7 +12,7 @@ Machine Vision is a smart-home security analytics layer built around Frigate-gen
 - identifies dwell and loitering
 - detects tailgating behind an authorized person
 - enriches identity with an optional CompreFace adapter
-- emits structured `VisionEvent` payloads over MQTT
+- emits structured `VisionEvent` payloads to a configured REST endpoint
 
 ## Architecture
 
@@ -23,7 +23,7 @@ Camera
 Frigate (YOLO + tracking)
   │
   ▼
-MQTT topic: frigate/events
+REST API: /api/events
   │
   ▼
 Machine Vision
@@ -38,7 +38,7 @@ Machine Vision
   └─ VisionEvent generation
         │
         ▼
-MQTT topic: home/vision/events
+REST API: /api/v1/observations or any configured output URL
 ```
 
 Important: this service expects Frigate to do the actual person detection and tracking. It is the decision layer, not the ML detector itself.
@@ -61,9 +61,7 @@ Important: this service expects Frigate to do the actual person detection and tr
 │   ├── snapshots/
 │   └── test_videos/
 ├── docker/
-│   ├── docker-compose.yml
-│   └── mosquitto/
-│       └── mosquitto.conf
+│   └── docker-compose.yml
 ├── src/
 │   ├── __init__.py
 │   ├── demo.py
@@ -78,7 +76,7 @@ Important: this service expects Frigate to do the actual person detection and tr
 │   │   └── incident_manager.py
 │   ├── events/
 │   │   ├── event_generator.py
-│   │   └── mqtt_publisher.py
+│   │   └── restapi_publisher.py
 │   ├── identity/
 │   │   └── compreface.py
 │   ├── ingestion/
@@ -129,10 +127,9 @@ cp .env.example .env
 A typical `.env` includes:
 
 ```env
-MQTT_HOST=localhost
-MQTT_PORT=1883
-MQTT_TOPIC=frigate/events
-MQTT_OUTPUT_TOPIC=home/vision/events
+RESTAPI_URL=http://localhost:8000
+RESTAPI_API_KEY=
+FRIGATE_URL=http://localhost:5000
 LOITER_THRESHOLD_SECONDS=30
 TAILGATE_WINDOW_SECONDS=3
 COMPREFACE_URL=http://localhost:8000
@@ -182,9 +179,7 @@ This project includes behavioral tests for:
 - event generation
 - end-to-end pipeline behavior
 
-### Start MQTT locally
-
-The repo includes a local broker setup for development:
+### Start the REST API locally
 
 ```bash
 cd /workspaces/machine_vision/docker
@@ -195,7 +190,7 @@ Then run the service:
 
 ```bash
 cd /workspaces/machine_vision
-python src/main.py
+python src/main.py --rest
 ```
 
 ## Configuration
@@ -235,10 +230,10 @@ entrances:
 
 ## Frigate integration
 
-Frigate is the expected upstream detector and tracker. This service subscribes to MQTT events from Frigate and treats them as person observations. In practice, your flow is:
+Frigate is the expected upstream detector and tracker. This service polls the Frigate REST API and treats those payloads as person observations. In practice, your flow is:
 
 ```text
-Camera -> Frigate -> MQTT -> Machine Vision -> policy / automation layer
+Camera -> Frigate REST API -> Machine Vision -> policy / automation layer
 ```
 
 The code keeps a clean separation between:
@@ -266,7 +261,7 @@ All emitted alerts are structured as `VisionEvent` objects with fields such as:
 - `confidence`
 - `metadata`
 
-These are serialized as JSON and published to the configured MQTT output topic.
+These are serialized as JSON and sent to the configured REST output endpoint.
 
 ## Notes
 
@@ -326,13 +321,13 @@ cd /workspaces/machine_vision/docker
 docker compose up --build
 ```
 
-This includes a local Mosquitto broker for integration testing. The `machine-vision` service is also containerized and can connect to Frigate and CompreFace from other containers on the same Docker network.
+This starts the REST API service and can connect to Frigate and CompreFace from other containers on the same Docker network.
 
 ## Troubleshooting
 
 - Import errors: ensure the workspace root is on the Python path and the project dependencies are installed.
 - OpenCV import failure: install `libgl1` on Linux hosts.
-- MQTT broker not reachable: verify `MQTT_HOST` and `MQTT_PORT` values and ensure the Mosquitto service is up.
+- REST endpoint unavailable: verify `FRIGATE_URL` and `RESTAPI_URL` values and confirm the upstream services are reachable.
 - CompreFace unavailable: the adapter intentionally returns `UNKNOWN` instead of crashing the pipeline.
 - Malformed Frigate events: the normalizer is defensive and ignores invalid payloads gracefully.
 
