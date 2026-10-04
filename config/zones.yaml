@@ -1,0 +1,19 @@
+zones:
+  entrance:
+    polygon:
+      - [100, 100]
+      - [700, 100]
+      - [700, 500]
+      - [100, 500]
+  restricted_area:
+    polygon:
+      - [250, 150]
+      - [650, 150]
+      - [650, 450]
+      - [250, 450]
+
+entrances:
+  front_door:
+    line:
+      - [350, 100]
+      - [350, 500]

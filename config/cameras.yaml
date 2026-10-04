@@ -1,0 +1,15 @@
+cameras:
+  front_door:
+    id: front_door
+    kind: entrance
+    zone: entrance
+    line: front_door
+  back_door:
+    id: back_door
+    kind: entrance
+    zone: entrance
+    line: back_door
+  hallway:
+    id: hallway
+    kind: interior
+    zone: restricted_area

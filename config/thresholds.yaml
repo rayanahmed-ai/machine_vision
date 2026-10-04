@@ -1,0 +1,3 @@
+loiter_threshold_seconds: 30
+tailgate_window_seconds: 3
+compreface_min_similarity: 0.8
