@@ -17,9 +17,9 @@ except Exception:  # pragma: no cover
 class MQTTEventPublisher:
     """Publishes VisionEvent payloads to the configured MQTT output topic."""
 
-    def __init__(self, host: str = "localhost", port: int = 1883, output_topic: str = "home/vision/events") -> None:
-        self.host = host
-        self.port = int(port)
+    def __init__(self, host: str = "localhost", port: int | None = 1883, output_topic: str = "home/vision/events") -> None:
+        self.host = host or "localhost"
+        self.port = int(port if port is not None else 1883)
         self.output_topic = output_topic
         self.client = None
         if mqtt is not None:

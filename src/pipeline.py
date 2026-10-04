@@ -42,11 +42,16 @@ class VisionPipeline:
         self.dwell_calculator = DwellTimeCalculator()
         self.context_engine = ContextEngine()
         self.incident_manager = IncidentManager()
-        self.publisher = MQTTEventPublisher(
-            host=self.config.get("mqtt_host", "localhost"),
-            port=self.config.get("mqtt_port", 1883),
-            output_topic=self.config.get("mqtt_output_topic", "home/vision/events"),
-        )
+        mqtt_host = self.config.get("mqtt_host")
+        mqtt_port = self.config.get("mqtt_port")
+        if mqtt_host:
+            self.publisher = MQTTEventPublisher(
+                host=mqtt_host,
+                port=mqtt_port if mqtt_port is not None else 1883,
+                output_topic=self.config.get("mqtt_output_topic", "home/vision/events"),
+            )
+        else:
+            self.publisher = None
         self.tracks: dict[str, Track] = {}
         self.event_log: list[Any] = []
 
@@ -216,4 +221,6 @@ class VisionPipeline:
         return list(self.event_log)
 
     def publish_events(self) -> None:
+        if self.publisher is None:
+            return
         self.publisher.publish_events([event for event in self.event_log if hasattr(event, "event_type")])
